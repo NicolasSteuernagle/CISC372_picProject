@@ -1,0 +1,22 @@
+Script started on Thu 20 Apr 2023 04:35:55 PM EDT
+]0;nicosteu@login01.darwin:~/CISC372_picProject[?1034h[(ea-cisc372:nicosteu)@login01.darwin CISC372_picProject]$ sallo c --ntasks=1 --cpus-per-task=4 --partition=standard
+salloc: Granted job allocation 3988226
+salloc: Waiting for resource configuration
+salloc: Nodes r1n00 are ready for job
+]0;nicosteu@r1n00.darwin:~/CISC372_picProject[?1034h[nicosteu@r1n00 CISC372_picProject]$ export OMP_NUM_THREADS=$SLU RM_CPUS_PER_TASK
+]0;nicosteu@r1n00.darwin:~/CISC372_picProject[nicosteu@r1n00 CISC372_picProject]$ s ls
+README.md  makefile        [0m[38;5;13mpic1.jpg[0m  [38;5;34mpthread_darwin[0m
+core.9790  [38;5;34mopenmp_darwin[0m   [38;5;13mpic2.jpg[0m  pthreads_image.c
+image.c    openmp_image.c  [38;5;13mpic3.jpg[0m  stb_image.h
+image.h    output.txt      [38;5;13mpic4.jpg[0m  stb_image_write.h
+]0;nicosteu@r1n00.darwin:~/CISC372_picProject[nicosteu@r1n00 CISC372_picProject]$ srun openmp_darwin pic1.jpg  edge
+Took 7 seconds
+]0;nicosteu@r1n00.darwin:~/CISC372_picProject[nicosteu@r1n00 CISC372_picProject]$ srun pthread_darwin pic1.jp g edge
+Took 6 seconds
+]0;nicosteu@r1n00.darwin:~/CISC372_picProject[nicosteu@r1n00 CISC372_picProject]$ exit
+logout
+salloc: Relinquishing job allocation 3988226
+]0;nicosteu@login01.darwin:~/CISC372_picProject[(ea-cisc372:nicosteu)@login01.darwin CISC372_picProject]$ exit
+exit
+
+Script done on Thu 20 Apr 2023 04:36:53 PM EDT
