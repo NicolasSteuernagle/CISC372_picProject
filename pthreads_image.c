@@ -65,7 +65,7 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
 //            destImage: A pointer to a  pre-allocated (including space for the pixel array) structure to receive the convoluted image.  It should be the same size as srcImage
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
-void* convolution_thread(void* args) {
+void* convolute_thread(void* args) {
     threadArgs* funcArgs = (threadArgs*)args;
     Image* srcImage = funcArgs->srcImage;
     Image* destImage = funcArgs->destImage;
@@ -102,7 +102,7 @@ void convolute(Image* srcImage, Image* destImage, Matrix algorithm) {
         if (i == numThreads - 1) {
             args[i].endRow += remainder;
         }
-        pthread_create(&threads[i], NULL, convolution_thread, &args[i]);
+        pthread_create(&threads[i], NULL, convolute_thread, &args[i]);
         currentRow += rowsPerThread;
     }
     for (int i = 0; i < numThreads; i++) {
