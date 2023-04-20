@@ -10,7 +10,14 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
-int thread_count;
+typedef struct {
+    Image* srcImage;
+    Image* destImage;
+    int startRow;
+    int endRow;
+} threadArgs;
+
+enum KernelTypes type;
 
 //An array of kernel matrices to be used for image convolution.  
 //The indexes of these match the enumeration from the header file. ie. algorithms[BLUR] returns the kernel corresponding to a box blur.
@@ -53,53 +60,56 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
     return result;
 }
 
-typedef struct{
-	Image* srcImage;
-	Image* destImage;
-	Matrix algorithm;
-}threadArgs;
-
-threadArgs funcArgs;
-
-
 //convolute:  Applies a kernel matrix to an image
 //Parameters: srcImage: The image being convoluted
 //            destImage: A pointer to a  pre-allocated (including space for the pixel array) structure to receive the convoluted image.  It should be the same size as srcImage
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
-void convolute(Image* srcImage,Image* destImage,Matrix algorithm){
-    int row,pix,bit,span;
-    span=srcImage->bpp*srcImage->bpp;
-    for (row=0;row<srcImage->height;row++){
-        for (pix=0;pix<srcImage->width;pix++){
-            for (bit=0;bit<srcImage->bpp;bit++){
-                destImage->data[Index(pix,row,srcImage->width,bit,srcImage->bpp)]=getPixelValue(srcImage,pix,row,bit,algorithm);
+void* convolution_thread(void* args) {
+    threadArgs* funcArgs = (threadArgs*)args;
+    Image* srcImage = funcArgs->srcImage;
+    Image* destImage = funcArgs->destImage;
+    int startRow = funcArgs->startRow;
+    int endRow = funcArgs->endRow;
+    int row, pix, bit, span;
+    span = srcImage->bpp * srcImage->bpp;
+    for (row = startRow; row < endRow; row++) {
+        for (pix = 0; pix < srcImage->width; pix++) {
+            for (bit = 0; bit < srcImage->bpp; bit++) {
+                destImage->data[Index(pix, row, srcImage->width, bit, srcImage->bpp)] = getPixelValue(srcImage, pix, row, bit,algorithms[type]);
             }
         }
     }
+
+    return NULL;
 }
 
-void* thread_method(void * rank){
-	long my_rank = (long) rank;
-	int pix,bit,span,i;
-	int totalImageRows =funcArgs.destImage->height;
-        span = funcArgs.srcImage->bpp * funcArgs.srcImage->bpp;
-	int local_m = (int) totalImageRows / thread_count;
-	int my_first_row = (int) my_rank * local_m;
-	int my_last_row = (my_rank+1) * local_m - 1;
-	if((int)my_rank == thread_count - 1){
-		local_m +=totalImageRows % thread_count;
-	}
-	
-	for(i = my_first_row; i < my_last_row; i++){
-		for(pix = 0; pix < funcArgs.srcImage->width; pix++){
-			for(bit = 0; bit < funcArgs.srcImage->bpp; bit++){
-				funcArgs.destImage->data[Index(pix,i,funcArgs.srcImage->width,bit,funcArgs.srcImage->bpp)] = getPixelValue(funcArgs.srcImage,pix,i,bit,funcArgs.algorithm);
-			}
-		}
-	}	
-	return NULL;
+void convolute(Image* srcImage, Image* destImage, Matrix algorithm) {
+    int numRows = srcImage->height;
+    int numThreads = 4;
+    pthread_t threads[numThreads];
+    threadArgs args[numThreads];
+
+    int rowsPerThread = numRows / numThreads;
+    int remainder = numRows % numThreads;
+    int currentRow = 0;
+
+    for (int i = 0; i < numThreads; i++) {
+        args[i].srcImage = srcImage;
+        args[i].destImage = destImage;
+        args[i].startRow = currentRow;
+	args[i].endRow = currentRow + rowsPerThread;
+        if (i == numThreads - 1) {
+            args[i].endRow += remainder;
+        }
+        pthread_create(&threads[i], NULL, convolution_thread, &args[i]);
+        currentRow += rowsPerThread;
+    }
+    for (int i = 0; i < numThreads; i++) {
+        pthread_join(threads[i], NULL);
+    }
 }
+
 
 //Usage: Prints usage information for the program
 //Returns: -1
@@ -144,27 +154,12 @@ int main(int argc,char** argv){
     destImage.height=srcImage.height;
     destImage.width=srcImage.width;
     destImage.data=malloc(sizeof(uint8_t)*destImage.width*destImage.bpp*destImage.height);
-
-    long thread;
-    pthread_t* thread_handles;
-    thread_count = strtol(argv[3],NULL,10);
-    thread_handles = (pthread_t*)malloc(thread_count*sizeof(pthread_t));
-
-    for(thread = 0; thread < thread_count;thread++){
-	funcArgs.srcImage = &srcImage;
-	funcArgs.destImage = &destImage;
-	pthread_create(&thread_handles[thread],NULL,&thread_method,(void*)thread);
-    }    
-
-    for(thread = 0;thread < thread_count; thread++){
-	pthread_join(thread_handles[thread],NULL);
-    }
-
-    t2 = time(NULL);
+    convolute(&srcImage,&destImage,algorithms[type]);
     stbi_write_png("output.png",destImage.width,destImage.height,destImage.bpp,destImage.data,destImage.bpp*destImage.width);
     stbi_image_free(srcImage.data);
     
     free(destImage.data);
+    t2=time(NULL);
     printf("Took %ld seconds\n",t2-t1);
    return 0;
 }
